@@ -70,15 +70,107 @@ validate_prerequisites() {
     success "Prerequisites validated"
 }
 
+# Clean up partial deployments
+cleanup_partial_deployment() {
+    log "🧹 Checking for partial deployments..."
+    
+    cd "${SCRIPT_DIR}"
+    
+    # Create terraform.tfvars for operations
+    cat > terraform.tfvars <<EOF
+environment = "${ENVIRONMENT}"
+location = "${LOCATION}"
+resource_prefix = "${RESOURCE_PREFIX}"
+admin_object_id = "${ADMIN_OBJECT_ID}"
+EOF
+    
+    local resource_group="${RESOURCE_PREFIX}-${ENVIRONMENT}-rg"
+    
+    # Check if resource group exists
+    if az group show --name "${resource_group}" &> /dev/null; then
+        warning "Found existing resource group: ${resource_group}"
+        echo
+        echo "Options for handling existing deployment:"
+        echo "1) Clean up and start fresh (RECOMMENDED for failed deployments)"
+        echo "2) Continue with existing resources (may cause conflicts)"
+        echo "3) Cancel deployment"
+        echo
+        read -p "Choose option (1/2/3): " -n 1 -r
+        echo
+        
+        case $REPLY in
+            1)
+                log "Cleaning up existing resources..."
+                
+                # Import existing state if terraform.tfstate doesn't exist
+                if [[ ! -f "terraform.tfstate" ]]; then
+                    log "Importing existing resource group to Terraform state..."
+                    terraform import azurerm_resource_group.main "/subscriptions/$(az account show --query id -o tsv)/resourceGroups/${resource_group}" || true
+                fi
+                
+                # Destroy existing resources
+                warning "This will destroy all resources in ${resource_group}"
+                read -p "Are you sure? (y/N): " -n 1 -r
+                echo
+                if [[ $REPLY =~ ^[Yy]$ ]]; then
+                    log "Destroying existing resources..."
+                    terraform destroy -var-file=terraform.tfvars -auto-approve || {
+                        warning "Terraform destroy failed, trying Azure CLI cleanup..."
+                        az group delete --name "${resource_group}" --yes --no-wait
+                        log "Initiated resource group deletion via Azure CLI"
+                        log "Waiting for deletion to complete..."
+                        
+                        # Wait for resource group deletion
+                        local max_wait=300  # 5 minutes
+                        local wait_time=0
+                        while az group show --name "${resource_group}" &> /dev/null && [[ $wait_time -lt $max_wait ]]; do
+                            sleep 10
+                            wait_time=$((wait_time + 10))
+                            log "Still waiting for resource group deletion... (${wait_time}s)"
+                        done
+                        
+                        if az group show --name "${resource_group}" &> /dev/null; then
+                            error "Resource group deletion timed out. Please check Azure portal and try again."
+                        fi
+                    }
+                    
+                    # Clean up Terraform state
+                    rm -f terraform.tfstate terraform.tfstate.backup tfplan deployment-info.json
+                    success "Cleanup completed successfully"
+                else
+                    error "Cleanup cancelled by user"
+                fi
+                ;;
+            2)
+                warning "Continuing with existing resources - conflicts may occur"
+                log "Importing existing state..."
+                terraform import azurerm_resource_group.main "/subscriptions/$(az account show --query id -o tsv)/resourceGroups/${resource_group}" || true
+                ;;
+            3)
+                log "Deployment cancelled by user"
+                return 1
+                ;;
+            *)
+                error "Invalid option selected"
+                ;;
+        esac
+    else
+        log "No existing resource group found - proceeding with fresh deployment"
+    fi
+}
+
 # Phase 1: Infrastructure Deployment (Day 1-2)
 deploy_infrastructure() {
     log "🏗️  Phase 1: Deploying production infrastructure..."
     
     cd "${SCRIPT_DIR}"
     
+    # Handle partial deployments
+    cleanup_partial_deployment
+    
     # Initialize Terraform
     log "Initializing Terraform..."
-    terraform init
+    terraform init -upgrade
     
     # Create terraform.tfvars
     cat > terraform.tfvars <<EOF
@@ -407,6 +499,9 @@ main() {
         "rollback")
             rollback_deployment
             ;;
+        "cleanup")
+            cleanup_partial_deployment
+            ;;
         "report")
             generate_report
             ;;
@@ -419,7 +514,7 @@ main() {
             generate_report
             ;;
         *)
-            echo "Usage: $0 {prereq|infra|app|security|validate|rollback|report|all}"
+            echo "Usage: $0 {prereq|infra|app|security|validate|rollback|cleanup|report|all}"
             echo
             echo "Commands:"
             echo "  prereq   - Validate prerequisites only"
@@ -428,6 +523,7 @@ main() {
             echo "  security - Configure security (Phase 3)"
             echo "  validate - Validate deployment (Phase 4)"
             echo "  rollback - Rollback deployment (destroys resources)"
+            echo "  cleanup  - Clean up partial/failed deployments"
             echo "  report   - Generate deployment report"
             echo "  all      - Run complete deployment (default)"
             exit 1
