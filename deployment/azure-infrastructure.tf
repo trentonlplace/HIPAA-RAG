@@ -138,7 +138,7 @@ resource "azurerm_subnet_network_security_group_association" "private_endpoints"
 
 # Key Vault for HIPAA Customer-Managed Keys
 resource "azurerm_key_vault" "main" {
-  name                       = "${var.resource_prefix}-${var.environment}-kv"
+  name                       = "${var.resource_prefix}-${var.environment}-kv-${formatdate("MMDD", timestamp())}"
   location                   = azurerm_resource_group.main.location
   resource_group_name        = azurerm_resource_group.main.name
   tenant_id                  = data.azurerm_client_config.current.tenant_id
@@ -351,7 +351,7 @@ resource "azurerm_service_plan" "main" {
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   os_type             = "Linux"
-  sku_name            = "S0"  # Free Standard tier to avoid quota issues
+  sku_name            = "S1"  # Standard S1 pay-per-use tier
 
   tags = azurerm_resource_group.main.tags
 }
