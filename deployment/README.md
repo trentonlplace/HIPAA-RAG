@@ -2,6 +2,16 @@
 
 Complete guide for deploying the HIPAA-compliant RAG system to Azure production.
 
+## ⚠️ IMPORTANT: Automated Deployment Limitations
+
+The automated deployment script (`deploy.sh`) may fail due to:
+- Azure quota restrictions in your subscription
+- Key Vault soft-delete conflicts from previous deployments
+- Network access restrictions preventing key creation
+- App Service Plan SKU availability in your region
+
+**If automated deployment fails**, please follow the [Manual Deployment Guide](manual-deployment-guide.md) which includes all necessary workarounds.
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -10,8 +20,10 @@ Complete guide for deploying the HIPAA-compliant RAG system to Azure production.
 2. **Terraform** - Version >= 1.0.0
 3. **Required permissions** - Owner or Contributor role on Azure subscription
 4. **Tools installed**: `jq`, `curl`
+5. **Location**: Deployment requires **East US 2** (not East US)
+6. **App Service**: Must use **S1 Standard** tier for HIPAA compliance
 
-### One-Command Deployment
+### One-Command Deployment (Automated)
 
 ```bash
 cd deployment
@@ -19,6 +31,8 @@ cd deployment
 ```
 
 This runs the complete 4-phase deployment process automatically.
+
+**Note**: If this fails, use the [Manual Deployment Guide](manual-deployment-guide.md) instead.
 
 ## 📋 Deployment Phases
 
@@ -302,6 +316,30 @@ az network application-gateway stop \
 
 ### Common Issues
 
+#### ⚠️ Critical: Automated Deployment Failures
+
+If `./deploy.sh` fails with any of these errors, **use the [Manual Deployment Guide](manual-deployment-guide.md)**:
+
+1. **Key Vault Access Denied (403 Forbidden)**
+   - Error: "Public network access is disabled and request is not from a trusted service"
+   - Cause: Script tries to create keys in a Key Vault with public access disabled
+   - Solution: Follow manual deployment to temporarily enable public access
+
+2. **App Service Plan Quota Exceeded**
+   - Error: "Subscription doesn't have required quota for PremiumV3Small VMs"
+   - Cause: No P2v3 quota in East US
+   - Solution: Use East US 2 with S1 Standard tier
+
+3. **Wrong Location Deployment**
+   - Symptom: Resources deployed to East US instead of East US 2
+   - Cause: Default location in script is incorrect
+   - Solution: Set `LOCATION=eastus2` explicitly
+
+4. **Key Vault Name Already Exists**
+   - Error: "A vault with the same name already exists in deleted state"
+   - Cause: Previous failed deployment left soft-deleted Key Vault
+   - Solution: Use unique naming or purge old vaults
+
 #### Terraform Deployment Fails
 ```bash
 # Check Azure CLI login
@@ -323,7 +361,7 @@ az ad signed-in-user show --query id -o tsv
 
 # Update Key Vault access policy
 az keyvault set-policy \
-    --name "hipaa-rag-prod-kv" \
+    --name "hipaa-rag-prod-kv-0801" \
     --object-id "YOUR_OBJECT_ID" \
     --key-permissions create delete get list update
 ```

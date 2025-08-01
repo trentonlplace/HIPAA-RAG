@@ -1,0 +1,9 @@
+{
+  "deployment_date": "2025-08-01T22:30:14Z",
+  "environment": "prod",
+  "resource_group": "hipaa-rag-prod-rg",
+  "key_vault_uri": "https://hipaa-rag-prod-kv-0801.vault.azure.net/",
+  "web_app_name": "hipaa-rag-prod-app",
+  "storage_account": "hipaaragprodaudit",
+  "location": "eastus2"
+}
