@@ -9,7 +9,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_FILE="${SCRIPT_DIR}/deployment.log"
 ENVIRONMENT="${ENVIRONMENT:-prod}"
-LOCATION="${LOCATION:-eastus}"
+LOCATION="${LOCATION:-eastus2}"
 RESOURCE_PREFIX="${RESOURCE_PREFIX:-hipaa-rag}"
 
 # Colors for output
