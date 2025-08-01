@@ -100,6 +100,14 @@ cleanup_partial_deployment() {
     
     cd "${SCRIPT_DIR}"
     
+    # Get admin object ID if not set
+    if [[ -z "${ADMIN_OBJECT_ID:-}" ]]; then
+        ADMIN_OBJECT_ID=$(az ad signed-in-user show --query id -o tsv)
+        if [[ -z "${ADMIN_OBJECT_ID}" ]]; then
+            error "Could not retrieve current user's object ID"
+        fi
+    fi
+    
     # Create terraform.tfvars for operations
     cat > terraform.tfvars <<EOF
 environment = "${ENVIRONMENT}"
@@ -611,22 +619,17 @@ emergency_cleanup() {
         if [[ $REPLY =~ ^[1]$ ]]; then
             log "Starting emergency cleanup of ${resource_group}..."
             
-            # Try Terraform destroy first (fast if state exists)
-            if [[ -f "terraform.tfstate" ]] && terraform destroy -var-file=terraform.tfvars -auto-approve 2>/dev/null; then
-                success "Emergency cleanup completed via Terraform"
-            else
-                # Fallback to Azure CLI for immediate deletion
-                log "Using Azure CLI for immediate resource deletion..."
-                
-                # Start async deletion
-                az group delete --name "${resource_group}" --yes --no-wait 2>/dev/null && {
-                    success "Emergency cleanup initiated - resources are being deleted in background"
-                    log "Resource group '${resource_group}' deletion started asynchronously"
-                    log "You can monitor progress in Azure Portal or run: az group show --name '${resource_group}'"
-                } || {
-                    warning "Could not initiate emergency cleanup - please clean up manually"
-                }
-            fi
+            # Always use Azure CLI for immediate cleanup (fastest)
+            log "Using Azure CLI for immediate resource deletion..."
+            
+            # Start async deletion
+            az group delete --name "${resource_group}" --yes --no-wait 2>/dev/null && {
+                success "Emergency cleanup initiated - resources are being deleted in background"
+                log "Resource group '${resource_group}' deletion started asynchronously"
+                log "You can monitor progress in Azure Portal or run: az group show --name '${resource_group}'"
+            } || {
+                warning "Could not initiate emergency cleanup - please clean up manually"
+            }
             
             # Clean up local files
             rm -f terraform.tfstate terraform.tfstate.backup tfplan deployment-info.json

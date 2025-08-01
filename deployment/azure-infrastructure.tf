@@ -351,7 +351,7 @@ resource "azurerm_service_plan" "main" {
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   os_type             = "Linux"
-  sku_name            = "S2"  # Standard tier to avoid quota issues
+  sku_name            = "B2"  # Basic tier to avoid quota issues
 
   tags = azurerm_resource_group.main.tags
 }
@@ -445,7 +445,7 @@ resource "azurerm_key_vault_access_policy" "app" {
   ]
 }
 
-# Private Endpoints
+# Private Endpoints (created after keys to avoid access issues)
 resource "azurerm_private_endpoint" "key_vault" {
   name                = "${var.resource_prefix}-${var.environment}-kv-pe"
   location            = azurerm_resource_group.main.location
@@ -461,7 +461,12 @@ resource "azurerm_private_endpoint" "key_vault" {
 
   tags = azurerm_resource_group.main.tags
   
-  depends_on = [azurerm_key_vault.main]
+  # Create private endpoint AFTER keys are created
+  depends_on = [
+    azurerm_key_vault_key.phi_primary,
+    azurerm_key_vault_key.phi_backup,
+    azurerm_key_vault_key.audit_logs
+  ]
 }
 
 resource "azurerm_private_endpoint" "storage" {
@@ -496,7 +501,7 @@ resource "azurerm_private_endpoint" "app" {
   tags = azurerm_resource_group.main.tags
 }
 
-# Azure Monitor Diagnostic Settings
+# Azure Monitor Diagnostic Settings (created after private endpoints)
 resource "azurerm_monitor_diagnostic_setting" "key_vault" {
   name               = "${var.resource_prefix}-${var.environment}-kv-diag"
   target_resource_id = azurerm_key_vault.main.id
@@ -514,6 +519,8 @@ resource "azurerm_monitor_diagnostic_setting" "key_vault" {
     category = "AllMetrics"
     enabled  = true
   }
+
+  depends_on = [azurerm_private_endpoint.key_vault]
 }
 
 resource "azurerm_monitor_diagnostic_setting" "storage" {
