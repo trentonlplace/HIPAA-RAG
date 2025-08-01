@@ -70,6 +70,30 @@ validate_prerequisites() {
     success "Prerequisites validated"
 }
 
+# Wait for resource group deletion to complete
+wait_for_resource_group_deletion() {
+    local resource_group="$1"
+    local max_wait="${2:-60}"  # Default 1 minute
+    local wait_time=0
+    
+    log "Checking if resource group deletion is complete..."
+    
+    while az group show --name "${resource_group}" &> /dev/null && [[ $wait_time -lt $max_wait ]]; do
+        sleep 5
+        wait_time=$((wait_time + 5))
+        log "Resource group still exists, waiting... (${wait_time}s/${max_wait}s)"
+    done
+    
+    if az group show --name "${resource_group}" &> /dev/null; then
+        warning "Resource group still exists after ${max_wait}s - continuing anyway"
+        log "Note: Azure deletion may still be in progress in the background"
+        return 1
+    else
+        success "Resource group deletion confirmed complete"
+        return 0
+    fi
+}
+
 # Clean up partial deployments
 cleanup_partial_deployment() {
     log "🧹 Checking for partial deployments..."
@@ -113,26 +137,48 @@ EOF
                 read -p "Are you sure? (y/N): " -n 1 -r
                 echo
                 if [[ $REPLY =~ ^[Yy]$ ]]; then
-                    log "Destroying existing resources..."
-                    terraform destroy -var-file=terraform.tfvars -auto-approve || {
-                        warning "Terraform destroy failed, trying Azure CLI cleanup..."
-                        az group delete --name "${resource_group}" --yes --no-wait
-                        log "Initiated resource group deletion via Azure CLI"
-                        log "Waiting for deletion to complete..."
-                        
-                        # Wait for resource group deletion
-                        local max_wait=300  # 5 minutes
-                        local wait_time=0
-                        while az group show --name "${resource_group}" &> /dev/null && [[ $wait_time -lt $max_wait ]]; do
-                            sleep 10
-                            wait_time=$((wait_time + 10))
-                            log "Still waiting for resource group deletion... (${wait_time}s)"
-                        done
-                        
-                        if az group show --name "${resource_group}" &> /dev/null; then
-                            error "Resource group deletion timed out. Please check Azure portal and try again."
-                        fi
-                    }
+                    echo
+                    echo "Cleanup methods:"
+                    echo "1) Terraform destroy (slower but cleaner)"
+                    echo "2) Azure CLI async delete (faster, runs in background)"
+                    echo
+                    read -p "Choose cleanup method (1/2): " -n 1 -r
+                    echo
+                    
+                    case $REPLY in
+                        1)
+                            log "Destroying existing resources via Terraform..."
+                            terraform destroy -var-file=terraform.tfvars -auto-approve || {
+                                warning "Terraform destroy failed, falling back to Azure CLI..."
+                                az group delete --name "${resource_group}" --yes --no-wait
+                                success "Resource group deletion initiated asynchronously"
+                            }
+                            ;;
+                        2)
+                            log "Initiating fast async deletion via Azure CLI..."
+                            az group delete --name "${resource_group}" --yes --no-wait && {
+                                success "Resource group deletion started in background"
+                                
+                                # Wait a short time to see if deletion completes quickly
+                                if wait_for_resource_group_deletion "${resource_group}" 30; then
+                                    log "Fast deletion completed!"
+                                else
+                                    log "Deletion still in progress - you can proceed with deployment"
+                                    log "Monitor progress with: az group show --name '${resource_group}'"
+                                fi
+                            } || {
+                                error "Failed to initiate resource group deletion"
+                            }
+                            ;;
+                        *)
+                            log "Using default Terraform destroy..."
+                            terraform destroy -var-file=terraform.tfvars -auto-approve || {
+                                warning "Terraform destroy failed, trying Azure CLI cleanup..."
+                                az group delete --name "${resource_group}" --yes --no-wait
+                                success "Resource group deletion initiated asynchronously"
+                            }
+                            ;;
+                    esac
                     
                     # Clean up Terraform state
                     rm -f terraform.tfstate terraform.tfstate.backup tfplan deployment-info.json
@@ -167,6 +213,18 @@ deploy_infrastructure() {
     
     # Handle partial deployments
     cleanup_partial_deployment
+    
+    # Double-check resource group doesn't exist before proceeding
+    local resource_group="${RESOURCE_PREFIX}-${ENVIRONMENT}-rg"
+    if az group show --name "${resource_group}" &> /dev/null; then
+        warning "Resource group ${resource_group} still exists!"
+        log "Waiting for deletion to complete before proceeding..."
+        if wait_for_resource_group_deletion "${resource_group}" 120; then
+            success "Resource group deletion completed - proceeding with deployment"
+        else
+            error "Resource group still exists after waiting. Please check Azure portal and try again later."
+        fi
+    fi
     
     # Initialize Terraform
     log "Initializing Terraform..."
@@ -531,8 +589,59 @@ main() {
     esac
 }
 
+# Emergency cleanup function
+emergency_cleanup() {
+    local exit_code=$?
+    local line_no=$1
+    
+    error "Deployment failed at line $line_no"
+    
+    if [[ -f "terraform.tfvars" ]]; then
+        local resource_group="${RESOURCE_PREFIX}-${ENVIRONMENT}-rg"
+        
+        warning "Deployment failed! Initiating emergency cleanup..."
+        echo
+        echo "Options:"
+        echo "1) Delete failed resources immediately (RECOMMENDED)"
+        echo "2) Leave resources for manual inspection"
+        echo
+        read -p "Choose option (1/2): " -n 1 -r
+        echo
+        
+        if [[ $REPLY =~ ^[1]$ ]]; then
+            log "Starting emergency cleanup of ${resource_group}..."
+            
+            # Try Terraform destroy first (fast if state exists)
+            if [[ -f "terraform.tfstate" ]] && terraform destroy -var-file=terraform.tfvars -auto-approve 2>/dev/null; then
+                success "Emergency cleanup completed via Terraform"
+            else
+                # Fallback to Azure CLI for immediate deletion
+                log "Using Azure CLI for immediate resource deletion..."
+                
+                # Start async deletion
+                az group delete --name "${resource_group}" --yes --no-wait 2>/dev/null && {
+                    success "Emergency cleanup initiated - resources are being deleted in background"
+                    log "Resource group '${resource_group}' deletion started asynchronously"
+                    log "You can monitor progress in Azure Portal or run: az group show --name '${resource_group}'"
+                } || {
+                    warning "Could not initiate emergency cleanup - please clean up manually"
+                }
+            fi
+            
+            # Clean up local files
+            rm -f terraform.tfstate terraform.tfstate.backup tfplan deployment-info.json
+            log "Local deployment files cleaned up"
+        else
+            warning "Resources left for manual inspection in resource group: ${resource_group}"
+            log "To clean up later, run: ./deploy.sh cleanup"
+        fi
+    fi
+    
+    exit $exit_code
+}
+
 # Trap errors and cleanup
-trap 'error "Deployment failed at line $LINENO"' ERR
+trap 'emergency_cleanup $LINENO' ERR
 
 # Run main function
 main "$@"
