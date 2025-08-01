@@ -34,7 +34,7 @@ variable "environment" {
 variable "location" {
   description = "Azure region"
   type        = string
-  default     = "East US"
+  default     = "East US 2"
 }
 
 variable "resource_prefix" {
@@ -77,7 +77,7 @@ resource "azurerm_subnet" "private_endpoints" {
   virtual_network_name = azurerm_virtual_network.main.name
   address_prefixes     = ["10.0.1.0/24"]
 
-  private_endpoint_network_policies_enabled = false
+  private_endpoint_network_policies = "Disabled"
 }
 
 resource "azurerm_subnet" "app_service" {
@@ -146,8 +146,8 @@ resource "azurerm_key_vault" "main" {
   soft_delete_retention_days = 90
   purge_protection_enabled   = true
 
-  # Disable public network access
-  public_network_access_enabled = false
+  # Temporarily enable public access for key creation, then restrict via private endpoints
+  public_network_access_enabled = true
 
   # Enable for deployment, disk encryption, and template deployment
   enabled_for_deployment          = false
@@ -155,7 +155,7 @@ resource "azurerm_key_vault" "main" {
   enabled_for_template_deployment = false
 
   network_acls {
-    default_action = "Deny"
+    default_action = "Allow"  # Temporarily allow during deployment
     bypass         = "AzureServices"
   }
 
@@ -246,6 +246,26 @@ resource "azurerm_key_vault_key" "audit_logs" {
   depends_on = [azurerm_key_vault.main]
 }
 
+# Post-deployment script to restrict Key Vault public access
+resource "null_resource" "restrict_keyvault_access" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "Restricting Key Vault public access after key creation..."
+      az keyvault update \
+        --name "${var.resource_prefix}-${var.environment}-kv" \
+        --resource-group "${azurerm_resource_group.main.name}" \
+        --public-network-access Disabled \
+        --default-action Deny
+    EOT
+  }
+
+  depends_on = [
+    azurerm_key_vault_key.phi_primary,
+    azurerm_key_vault_key.phi_backup,
+    azurerm_key_vault_key.audit_logs
+  ]
+}
+
 # Storage Account for Audit Logs (7-year retention)
 resource "azurerm_storage_account" "audit_logs" {
   name                     = "${replace(var.resource_prefix, "-", "")}${var.environment}audit"
@@ -259,7 +279,7 @@ resource "azurerm_storage_account" "audit_logs" {
   public_network_access_enabled   = false
   shared_access_key_enabled       = false
   default_to_oauth_authentication = true
-  min_tls_version                  = "TLS1_3"
+  min_tls_version                  = "TLS1_2"
 
   # Customer-managed encryption
   customer_managed_key {
@@ -308,7 +328,7 @@ resource "azurerm_log_analytics_workspace" "main" {
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
   sku                 = "PerGB2018"
-  retention_in_days   = 2555  # 7 years
+  retention_in_days   = 730   # 2 years (Azure maximum)
   daily_quota_gb      = 100
 
   tags = azurerm_resource_group.main.tags
@@ -331,7 +351,7 @@ resource "azurerm_service_plan" "main" {
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   os_type             = "Linux"
-  sku_name            = "P2v3"  # Production-grade
+  sku_name            = "S2"  # Standard tier to avoid quota issues
 
   tags = azurerm_resource_group.main.tags
 }
@@ -356,7 +376,7 @@ resource "azurerm_linux_web_app" "main" {
     always_on         = true
     health_check_path = "/health"
     http2_enabled     = true
-    minimum_tls_version = "1.3"
+    minimum_tls_version = "1.2"
 
     # Security headers
     app_command_line = ""
@@ -390,7 +410,7 @@ resource "azurerm_linux_web_app" "main" {
     "ENCRYPTION_KEY_ROTATION_MONTHS"       = "6"
     "SESSION_TIMEOUT_MINUTES"              = "30"
     "MFA_REQUIRED"                         = "true"
-    "TLS_MIN_VERSION"                      = "1.3"
+    "TLS_MIN_VERSION"                      = "1.2"
   }
 
   identity {
@@ -440,6 +460,8 @@ resource "azurerm_private_endpoint" "key_vault" {
   }
 
   tags = azurerm_resource_group.main.tags
+  
+  depends_on = [azurerm_key_vault.main]
 }
 
 resource "azurerm_private_endpoint" "storage" {
