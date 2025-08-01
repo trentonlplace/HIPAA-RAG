@@ -1,0 +1,552 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2021-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "description": "[PHI] HIPAA-Compliant Monitoring, Logging, and Alerting Template",
+    "classification": "PHI-SENSITIVE",
+    "author": "HIPAA Security Team",
+    "version": "1.0.0",
+    "lastUpdated": "2025-08-01"
+  },
+  "parameters": {
+    "environmentName": {
+      "type": "string",
+      "metadata": {
+        "description": "Environment name for resource naming"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for deployment"
+      }
+    },
+    "resourceToken": {
+      "type": "string",
+      "metadata": {
+        "description": "Unique token for resource naming"
+      }
+    },
+    "logRetentionDays": {
+      "type": "int",
+      "defaultValue": 2555,
+      "minValue": 2555,
+      "metadata": {
+        "description": "Log retention in days (minimum 7 years for HIPAA compliance)"
+      }
+    },
+    "securityContactEmail": {
+      "type": "string",
+      "metadata": {
+        "description": "Email address for security alerts"
+      }
+    },
+    "enableSentinel": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Enable Azure Sentinel for SIEM capabilities"
+      }
+    }
+  },
+  "variables": {
+    "resourcePrefix": "[concat('hipaa-rag-', parameters('resourceToken'))]",
+    "tags": {
+      "Environment": "[parameters('environmentName')]",
+      "Compliance": "HIPAA",
+      "DataClassification": "PHI-Monitoring",
+      "SecurityLevel": "Critical",
+      "Owner": "HIPAA-Security-Team"
+    },
+    "logAnalyticsWorkspaceName": "[concat('log-', variables('resourcePrefix'))]",
+    "applicationInsightsName": "[concat('appi-', variables('resourcePrefix'))]",
+    "actionGroupName": "[concat('ag-security-', variables('resourcePrefix'))]",
+    "sentinelWorkspaceName": "[concat('sentinel-', variables('resourcePrefix'))]",
+    "dataCollectionRuleName": "[concat('dcr-', variables('resourcePrefix'))]",
+    "workbookName": "[concat('workbook-hipaa-', variables('resourcePrefix'))]",
+    "automationAccountName": "[concat('aa-', variables('resourcePrefix'))]",
+    "storageAccountName": "[concat('stlog', replace(parameters('resourceToken'), '-', ''))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2021-09-01",
+      "name": "[variables('storageAccountName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "Standard_GRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "supportsHttpsTrafficOnly": true,
+        "minimumTlsVersion": "TLS1_2",
+        "allowBlobPublicAccess": false,
+        "allowSharedKeyAccess": false,
+        "publicNetworkAccess": "Disabled",
+        "encryption": {
+          "requireInfrastructureEncryption": true,
+          "services": {
+            "blob": {
+              "enabled": true
+            },
+            "file": {
+              "enabled": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2021-12-01-preview",
+      "name": "[variables('logAnalyticsWorkspaceName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "sku": {
+          "name": "PerGB2018"
+        },
+        "retentionInDays": "[parameters('logRetentionDays')]",
+        "features": {
+          "enableLogAccessUsingOnlyResourcePermissions": true,
+          "clusterResourceId": null,
+          "disableLocalAuth": true,
+          "enableDataExport": false
+        },
+        "workspaceCapping": {
+          "dailyQuotaGb": 10
+        },
+        "publicNetworkAccessForIngestion": "Disabled",
+        "publicNetworkAccessForQuery": "Disabled"
+      }
+    },
+    {
+      "type": "Microsoft.Insights/components",
+      "apiVersion": "2020-02-02",
+      "name": "[variables('applicationInsightsName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "kind": "web",
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]"
+      ],
+      "properties": {
+        "Application_Type": "web",
+        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]",
+        "IngestionMode": "LogAnalytics",
+        "publicNetworkAccessForIngestion": "Disabled",
+        "publicNetworkAccessForQuery": "Disabled",
+        "DisableIpMasking": false,
+        "DisableLocalAuth": true
+      }
+    },
+    {
+      "type": "Microsoft.Insights/actionGroups",
+      "apiVersion": "2021-09-01",
+      "name": "[variables('actionGroupName')]",
+      "location": "Global",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "groupShortName": "HIPAA-SEC",
+        "enabled": true,
+        "emailReceivers": [
+          {
+            "name": "SecurityTeam",
+            "emailAddress": "[parameters('securityContactEmail')]",
+            "useCommonAlertSchema": true
+          }
+        ],
+        "smsReceivers": [],
+        "webhookReceivers": [],
+        "itsmReceivers": [],
+        "azureAppPushReceivers": [],
+        "automationRunbookReceivers": [],
+        "voiceReceivers": [],
+        "logicAppReceivers": [],
+        "azureFunctionReceivers": [],
+        "armRoleReceivers": [
+          {
+            "name": "SecurityAdmin",
+            "roleId": "fb1c8493-542b-48eb-b624-b4c8fea62acd",
+            "useCommonAlertSchema": true
+          }
+        ]
+      }
+    },
+    {
+      "condition": "[parameters('enableSentinel')]",
+      "type": "Microsoft.OperationsManagement/solutions",
+      "apiVersion": "2015-11-01-preview",
+      "name": "[concat('SecurityInsights(', variables('logAnalyticsWorkspaceName'), ')')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]"
+      ],
+      "properties": {
+        "workspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]"
+      },
+      "plan": {
+        "name": "[concat('SecurityInsights(', variables('logAnalyticsWorkspaceName'), ')')]",
+        "publisher": "Microsoft",
+        "product": "OMSGallery/SecurityInsights",
+        "promotionCode": ""
+      }
+    },
+    {
+      "type": "Microsoft.Insights/dataCollectionRules",
+      "apiVersion": "2021-09-01-preview",
+      "name": "[variables('dataCollectionRuleName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]"
+      ],
+      "properties": {
+        "description": "HIPAA-compliant data collection rule for PHI-safe logging",
+        "dataSources": {
+          "performanceCounters": [
+            {
+              "streams": [
+                "Microsoft-Perf"
+              ],
+              "samplingFrequencyInSeconds": 60,
+              "counterSpecifiers": [
+                "\\Processor(_Total)\\% Processor Time",
+                "\\Memory\\Available MBytes",
+                "\\LogicalDisk(_Total)\\Disk Reads/sec",
+                "\\LogicalDisk(_Total)\\Disk Writes/sec"
+              ],
+              "name": "perfCounterDataSource60"
+            }
+          ],
+          "windowsEventLogs": [
+            {
+              "streams": [
+                "Microsoft-WindowsEvent"
+              ],
+              "xPathQueries": [
+                "Security!*[System[(EventID=4624 or EventID=4625 or EventID=4648 or EventID=4656 or EventID=4663 or EventID=4672)]]",
+                "System!*[System[Level=1 or Level=2 or Level=3]]",
+                "Application!*[System[Level=1 or Level=2]]"
+              ],
+              "name": "windowsEventLogsDataSource"
+            }
+          ],
+          "syslog": [
+            {
+              "streams": [
+                "Microsoft-Syslog"
+              ],
+              "facilityNames": [
+                "auth",
+                "authpriv",
+                "daemon",
+                "kern",
+                "local0",
+                "mail",
+                "syslog"
+              ],
+              "logLevels": [
+                "Debug",
+                "Info",
+                "Notice",
+                "Warning",
+                "Error",
+                "Critical",
+                "Alert",
+                "Emergency"
+              ],
+              "name": "sysLogsDataSource"
+            }
+          ]
+        },
+        "destinations": {
+          "logAnalytics": [
+            {
+              "workspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]",
+              "name": "la-destination"
+            }
+          ]
+        },
+        "dataFlows": [
+          {
+            "streams": [
+              "Microsoft-Perf"
+            ],
+            "destinations": [
+              "la-destination"
+            ]
+          },
+          {
+            "streams": [
+              "Microsoft-Syslog"
+            ],
+            "destinations": [
+              "la-destination"
+            ]
+          },
+          {
+            "streams": [
+              "Microsoft-WindowsEvent"
+            ],
+            "destinations": [
+              "la-destination"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Automation/automationAccounts",
+      "apiVersion": "2020-01-13-preview",
+      "name": "[variables('automationAccountName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "sku": {
+          "name": "Basic"
+        },
+        "publicNetworkAccess": false,
+        "disableLocalAuth": true
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(variables('logAnalyticsWorkspaceName'), '/HIPAA-PHI-Access-Audit')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]"
+      ],
+      "properties": {
+        "category": "HIPAA Compliance",
+        "displayName": "PHI Access Audit Query",
+        "query": "AppServiceHTTPLogs\n| where TimeGenerated > ago(24h)\n| where ScStatus >= 200 and ScStatus < 300\n| where CsUriStem contains \"api\" or CsUriStem contains \"chat\"\n| extend UserPrincipal = extract(\"(.*)@\", 1, CsUsername)\n| project TimeGenerated, CsUsername, UserPrincipal, CsUriStem, ScStatus, CsUserAgent, CIp\n| summarize AccessCount = count() by UserPrincipal, CsUriStem, bin(TimeGenerated, 1h)\n| order by TimeGenerated desc",
+        "tags": [
+          {
+            "name": "Compliance",
+            "value": "HIPAA"
+          },
+          {
+            "name": "DataType",
+            "value": "PHI-Access"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(variables('logAnalyticsWorkspaceName'), '/HIPAA-Failed-Authentication')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]"
+      ],
+      "properties": {
+        "category": "HIPAA Compliance",
+        "displayName": "Failed Authentication Attempts",
+        "query": "SigninLogs\n| where TimeGenerated > ago(1h)\n| where ResultType != 0\n| extend ErrorCode = tostring(Status.errorCode)\n| extend FailureReason = tostring(Status.failureReason)\n| project TimeGenerated, UserPrincipal, AppDisplayName, IPAddress, ErrorCode, FailureReason, LocationDetails\n| summarize FailedAttempts = count() by UserPrincipal, IPAddress, bin(TimeGenerated, 5m)\n| where FailedAttempts >= 3\n| order by TimeGenerated desc",
+        "tags": [
+          {
+            "name": "Compliance",
+            "value": "HIPAA"
+          },
+          {
+            "name": "SecurityEvent",
+            "value": "Authentication"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Insights/scheduledQueryRules",
+      "apiVersion": "2021-08-01",
+      "name": "HIPAA-PHI-Unauthorized-Access-Alert",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]",
+        "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+      ],
+      "properties": {
+        "displayName": "HIPAA - Unauthorized PHI Access Attempt",
+        "description": "Alert triggered when unauthorized access to PHI resources is detected",
+        "severity": 0,
+        "enabled": true,
+        "evaluationFrequency": "PT5M",
+        "windowSize": "PT15M",
+        "criteria": {
+          "allOf": [
+            {
+              "query": "AppServiceHTTPLogs\n| where TimeGenerated > ago(15m)\n| where ScStatus == 401 or ScStatus == 403\n| where CsUriStem contains \"api/chat\" or CsUriStem contains \"api/documents\"\n| summarize FailedAccess = count() by CIp, bin(TimeGenerated, 5m)\n| where FailedAccess >= 5",
+              "timeAggregation": "Count",
+              "operator": "GreaterThan",
+              "threshold": 0,
+              "failingPeriods": {
+                "numberOfEvaluationPeriods": 1,
+                "minFailingPeriodsToAlert": 1
+              }
+            }
+          ]
+        },
+        "actions": {
+          "actionGroups": [
+            "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+          ],
+          "customProperties": {
+            "Compliance": "HIPAA",
+            "Severity": "Critical",
+            "DataType": "PHI"
+          }
+        },
+        "autoMitigate": false,
+        "checkWorkspaceAlertsStorageConfigured": false,
+        "scopes": [
+          "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]"
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Insights/scheduledQueryRules",
+      "apiVersion": "2021-08-01",
+      "name": "HIPAA-Multiple-Failed-Auth-Alert",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]",
+        "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+      ],
+      "properties": {
+        "displayName": "HIPAA - Multiple Failed Authentication Attempts",
+        "description": "Alert for potential brute force attacks on HIPAA system",
+        "severity": 1,
+        "enabled": true,
+        "evaluationFrequency": "PT5M",
+        "windowSize": "PT10M",
+        "criteria": {
+          "allOf": [
+            {
+              "query": "SigninLogs\n| where TimeGenerated > ago(10m)\n| where ResultType != 0\n| summarize FailedAttempts = count() by UserPrincipal, IPAddress, bin(TimeGenerated, 5m)\n| where FailedAttempts >= 5",
+              "timeAggregation": "Count",
+              "operator": "GreaterThan",
+              "threshold": 0,
+              "failingPeriods": {
+                "numberOfEvaluationPeriods": 1,
+                "minFailingPeriodsToAlert": 1
+              }
+            }
+          ]
+        },
+        "actions": {
+          "actionGroups": [
+            "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+          ]
+        },
+        "autoMitigate": true,
+        "checkWorkspaceAlertsStorageConfigured": false,
+        "scopes": [
+          "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]"
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Insights/scheduledQueryRules",
+      "apiVersion": "2021-08-01",
+      "name": "HIPAA-Unusual-Data-Access-Alert",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]",
+        "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+      ],
+      "properties": {
+        "displayName": "HIPAA - Unusual Data Access Pattern",
+        "description": "Alert for unusual patterns in PHI data access",
+        "severity": 2,
+        "enabled": true,
+        "evaluationFrequency": "PT15M",
+        "windowSize": "PT1H",
+        "criteria": {
+          "allOf": [
+            {
+              "query": "AppServiceHTTPLogs\n| where TimeGenerated > ago(1h)\n| where ScStatus >= 200 and ScStatus < 300\n| where CsUriStem contains \"api/chat\" or CsUriStem contains \"api/documents\"\n| summarize RequestCount = count() by CsUsername, bin(TimeGenerated, 15m)\n| extend baseline = 50\n| where RequestCount > baseline * 3",
+              "timeAggregation": "Count",
+              "operator": "GreaterThan",
+              "threshold": 0,
+              "failingPeriods": {
+                "numberOfEvaluationPeriods": 2,
+                "minFailingPeriodsToAlert": 2
+              }
+            }
+          ]
+        },
+        "actions": {
+          "actionGroups": [
+            "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+          ]
+        },
+        "autoMitigate": true,
+        "checkWorkspaceAlertsStorageConfigured": false,
+        "scopes": [
+          "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]"
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Insights/workbooks",
+      "apiVersion": "2021-08-01",
+      "name": "[guid(variables('workbookName'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "kind": "shared",
+      "properties": {
+        "displayName": "HIPAA Compliance Dashboard",
+        "serializedData": "{\"version\":\"Notebook/1.0\",\"items\":[{\"type\":1,\"content\":{\"json\":\"## HIPAA Compliance Monitoring Dashboard\\n\\nThis dashboard provides real-time monitoring of HIPAA compliance metrics for the RAG system.\\n\\n**Key Metrics:**\\n- PHI Access Patterns\\n- Authentication Events\\n- System Security Status\\n- Compliance Violations\"},\"name\":\"text - 0\"},{\"type\":3,\"content\":{\"version\":\"KqlItem/1.0\",\"query\":\"AppServiceHTTPLogs\\n| where TimeGenerated > ago(24h)\\n| where ScStatus >= 200 and ScStatus < 300\\n| where CsUriStem contains \\\"api\\\"\\n| summarize PHI_Access_Count = count() by bin(TimeGenerated, 1h)\\n| render timechart\",\"size\":0,\"title\":\"PHI Access Over Time (24h)\",\"timeContext\":{\"durationMs\":86400000},\"queryType\":0,\"resourceType\":\"microsoft.operationalinsights/workspaces\"},\"name\":\"query - 1\"},{\"type\":3,\"content\":{\"version\":\"KqlItem/1.0\",\"query\":\"SigninLogs\\n| where TimeGenerated > ago(24h)\\n| summarize Successful = countif(ResultType == 0), Failed = countif(ResultType != 0) by bin(TimeGenerated, 1h)\\n| render timechart\",\"size\":0,\"title\":\"Authentication Events (24h)\",\"timeContext\":{\"durationMs\":86400000},\"queryType\":0,\"resourceType\":\"microsoft.operationalinsights/workspaces\"},\"name\":\"query - 2\"},{\"type\":3,\"content\":{\"version\":\"KqlItem/1.0\",\"query\":\"AppServiceHTTPLogs\\n| where TimeGenerated > ago(7d)\\n| where ScStatus == 401 or ScStatus == 403\\n| summarize Security_Violations = count() by bin(TimeGenerated, 1d)\\n| render columnchart\",\"size\":0,\"title\":\"Security Violations (7 days)\",\"timeContext\":{\"durationMs\":604800000},\"queryType\":0,\"resourceType\":\"microsoft.operationalinsights/workspaces\"},\"name\":\"query - 3\"}],\"isLocked\":false,\"fallbackResourceIds\":[\"/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.OperationalInsights/workspaces/{workspace-name}\"]}",
+        "category": "workbook",
+        "sourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]"
+      }
+    }
+  ],
+  "outputs": {
+    "logAnalyticsWorkspaceId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]"
+    },
+    "logAnalyticsWorkspaceName": {
+      "type": "string",
+      "value": "[variables('logAnalyticsWorkspaceName')]"
+    },
+    "applicationInsightsName": {
+      "type": "string",
+      "value": "[variables('applicationInsightsName')]"
+    },
+    "applicationInsightsConnectionString": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Insights/components', variables('applicationInsightsName'))).ConnectionString]"
+    },
+    "actionGroupId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+    },
+    "sentinelEnabled": {
+      "type": "bool",
+      "value": "[parameters('enableSentinel')]"
+    },
+    "complianceMonitoring": {
+      "type": "object",
+      "value": {
+        "logRetentionDays": "[parameters('logRetentionDays')]",
+        "sentinelEnabled": "[parameters('enableSentinel')]",
+        "alertingEnabled": true,
+        "phiSafeLogging": true,
+        "auditTrailComplete": true,
+        "workbookDeployed": true,
+        "dataCollectionRuleConfigured": true,
+        "complianceLevel": "HIPAA-Compliant"
+      }
+    }
+  }
+}

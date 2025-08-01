@@ -1,0 +1,303 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "description": "HIPAA/HITRUST policy assignments for RAG system compliance",
+    "classification": "PHI-CRITICAL",
+    "author": "HIPAA Compliance Team",
+    "version": "1.0.0",
+    "lastUpdated": "2025-08-01"
+  },
+  "parameters": {
+    "resourceGroupName": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource group name for policy assignments"
+      }
+    },
+    "subscriptionId": {
+      "type": "string", 
+      "metadata": {
+        "description": "Azure subscription ID"
+      }
+    },
+    "environmentName": {
+      "type": "string",
+      "allowedValues": [
+        "dev",
+        "staging",
+        "prod"
+      ],
+      "metadata": {
+        "description": "Environment name"
+      }
+    },
+    "logAnalyticsWorkspaceId": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource ID of the Log Analytics workspace for audit logging"
+      }
+    },
+    "securityOfficerId": {
+      "type": "string",
+      "metadata": {
+        "description": "Object ID of the HIPAA Security Officer"
+      }
+    }
+  },
+  "variables": {
+    "policyScope": "[concat('/subscriptions/', parameters('subscriptionId'), '/resourceGroups/', parameters('resourceGroupName'))]",
+    "assignmentSuffix": "[concat('-', parameters('environmentName'))]",
+    "builtInPolicies": {
+      "hitrust": "/providers/Microsoft.Authorization/policySetDefinitions/a169c3c4-c2b4-4c13-9f7f-31d7b6fb6fb7",
+      "nist": "/providers/Microsoft.Authorization/policySetDefinitions/cf25b9c1-bd23-4eb6-bd5c-f4f732f0c2ec",
+      "azureSecurityBenchmark": "/providers/Microsoft.Authorization/policySetDefinitions/1f3afdf9-d0c9-4c3d-847f-89da613e70a8"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Authorization/policyAssignments",
+      "apiVersion": "2022-06-01",
+      "name": "[concat('hipaa-hitrust-compliance', variables('assignmentSuffix'))]",
+      "properties": {
+        "displayName": "[concat('HIPAA HITRUST Compliance - ', parameters('environmentName'))]",
+        "description": "HIPAA HITRUST compliance policy set for PHI data protection",
+        "policyDefinitionId": "[variables('builtInPolicies').hitrust]",
+        "scope": "[variables('policyScope')]",
+        "notScopes": [],
+        "parameters": {},
+        "metadata": {
+          "assignedBy": "HIPAA-Compliance-Team",
+          "assignmentDate": "[utcNow()]",
+          "environment": "[parameters('environmentName')]",
+          "compliance": "HIPAA",
+          "version": "1.0.0"
+        },
+        "enforcementMode": "Default"
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/policyAssignments", 
+      "apiVersion": "2022-06-01",
+      "name": "[concat('nist-800-53-compliance', variables('assignmentSuffix'))]",
+      "properties": {
+        "displayName": "[concat('NIST SP 800-53 R4 Compliance - ', parameters('environmentName'))]",
+        "description": "NIST SP 800-53 R4 security controls for federal compliance",
+        "policyDefinitionId": "[variables('builtInPolicies').nist]",
+        "scope": "[variables('policyScope')]",
+        "notScopes": [],
+        "parameters": {},
+        "metadata": {
+          "assignedBy": "HIPAA-Compliance-Team",
+          "assignmentDate": "[utcNow()]",
+          "environment": "[parameters('environmentName')]",
+          "compliance": "NIST",
+          "version": "1.0.0"
+        },
+        "enforcementMode": "Default"
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/policyAssignments",
+      "apiVersion": "2022-06-01",
+      "name": "[concat('azure-security-benchmark', variables('assignmentSuffix'))]",
+      "properties": {
+        "displayName": "[concat('Azure Security Benchmark - ', parameters('environmentName'))]",
+        "description": "Azure Security Benchmark compliance for cloud security best practices",
+        "policyDefinitionId": "[variables('builtInPolicies').azureSecurityBenchmark]",
+        "scope": "[variables('policyScope')]",
+        "notScopes": [],
+        "parameters": {},
+        "metadata": {
+          "assignedBy": "HIPAA-Compliance-Team", 
+          "assignmentDate": "[utcNow()]",
+          "environment": "[parameters('environmentName')]",
+          "compliance": "AZURE-SECURITY",
+          "version": "1.0.0"
+        },
+        "enforcementMode": "Default"
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/policyAssignments",
+      "apiVersion": "2022-06-01",
+      "name": "[concat('hipaa-rag-phi-encryption', variables('assignmentSuffix'))]",
+      "properties": {
+        "displayName": "[concat('HIPAA-RAG PHI Encryption - ', parameters('environmentName'))]",
+        "description": "Ensures PHI data uses customer-managed encryption keys",
+        "policyDefinitionId": "[concat(variables('policyScope'), '/providers/Microsoft.Authorization/policyDefinitions/hipaa-rag-require-phi-encryption')]",
+        "scope": "[variables('policyScope')]",
+        "notScopes": [],
+        "parameters": {
+          "effect": {
+            "value": "[if(equals(parameters('environmentName'), 'prod'), 'Deny', 'Audit')]"
+          }
+        },
+        "metadata": {
+          "assignedBy": "HIPAA-Compliance-Team",
+          "assignmentDate": "[utcNow()]",
+          "environment": "[parameters('environmentName')]",
+          "compliance": "HIPAA-CUSTOM",
+          "hipaaControl": "164.312(a)(2)(iv)",
+          "version": "1.0.0"
+        },
+        "enforcementMode": "Default"
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/policyAssignments",
+      "apiVersion": "2022-06-01", 
+      "name": "[concat('hipaa-rag-private-endpoints', variables('assignmentSuffix'))]",
+      "properties": {
+        "displayName": "[concat('HIPAA-RAG Private Endpoints - ', parameters('environmentName'))]",
+        "description": "Ensures PHI services use private endpoints for network isolation",
+        "policyDefinitionId": "[concat(variables('policyScope'), '/providers/Microsoft.Authorization/policyDefinitions/hipaa-rag-require-private-endpoints')]",
+        "scope": "[variables('policyScope')]",
+        "notScopes": [],
+        "parameters": {
+          "effect": {
+            "value": "[if(equals(parameters('environmentName'), 'prod'), 'Deny', 'Audit')]"
+          }
+        },
+        "metadata": {
+          "assignedBy": "HIPAA-Compliance-Team",
+          "assignmentDate": "[utcNow()]",
+          "environment": "[parameters('environmentName')]",
+          "compliance": "HIPAA-CUSTOM",
+          "hipaaControl": "164.312(e)(1)",
+          "version": "1.0.0"
+        },
+        "enforcementMode": "Default"
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/policyAssignments",
+      "apiVersion": "2022-06-01",
+      "name": "[concat('hipaa-rag-audit-logging', variables('assignmentSuffix'))]",
+      "properties": {
+        "displayName": "[concat('HIPAA-RAG Audit Logging - ', parameters('environmentName'))]",
+        "description": "Ensures comprehensive audit logging for all PHI-handling resources",
+        "policyDefinitionId": "[concat(variables('policyScope'), '/providers/Microsoft.Authorization/policyDefinitions/hipaa-rag-require-audit-logging')]",
+        "scope": "[variables('policyScope')]",
+        "notScopes": [],
+        "parameters": {
+          "effect": {
+            "value": "AuditIfNotExists"
+          },
+          "logAnalyticsWorkspaceId": {
+            "value": "[parameters('logAnalyticsWorkspaceId')]"
+          }
+        },
+        "metadata": {
+          "assignedBy": "HIPAA-Compliance-Team",
+          "assignmentDate": "[utcNow()]",
+          "environment": "[parameters('environmentName')]",
+          "compliance": "HIPAA-CUSTOM",
+          "hipaaControl": "164.312(b)",
+          "version": "1.0.0"
+        },
+        "enforcementMode": "Default"
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/policyAssignments",
+      "apiVersion": "2022-06-01",
+      "name": "[concat('hipaa-rag-backup-retention', variables('assignmentSuffix'))]",
+      "properties": {
+        "displayName": "[concat('HIPAA-RAG Backup Retention - ', parameters('environmentName'))]",
+        "description": "Ensures backups meet HIPAA 7-year retention requirements",
+        "policyDefinitionId": "[concat(variables('policyScope'), '/providers/Microsoft.Authorization/policyDefinitions/hipaa-rag-require-backup-retention')]",
+        "scope": "[variables('policyScope')]", 
+        "notScopes": [],
+        "parameters": {
+          "effect": {
+            "value": "[if(equals(parameters('environmentName'), 'prod'), 'Deny', 'Audit')]"
+          },
+          "minRetentionDays": {
+            "value": 2555
+          }
+        },
+        "metadata": {
+          "assignedBy": "HIPAA-Compliance-Team",
+          "assignmentDate": "[utcNow()]",
+          "environment": "[parameters('environmentName')]",
+          "compliance": "HIPAA-CUSTOM",
+          "hipaaControl": "164.312(c)(2)",
+          "version": "1.0.0"
+        },
+        "enforcementMode": "Default"
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/policyAssignments",
+      "apiVersion": "2022-06-01",
+      "name": "[concat('hipaa-rag-access-controls', variables('assignmentSuffix'))]",
+      "properties": {
+        "displayName": "[concat('HIPAA-RAG Access Controls - ', parameters('environmentName'))]",
+        "description": "Ensures proper RBAC for PHI-handling resources",
+        "policyDefinitionId": "[concat(variables('policyScope'), '/providers/Microsoft.Authorization/policyDefinitions/hipaa-rag-require-access-controls')]",
+        "scope": "[variables('policyScope')]",
+        "notScopes": [],
+        "parameters": {
+          "effect": {
+            "value": "AuditIfNotExists"
+          }
+        },
+        "metadata": {
+          "assignedBy": "HIPAA-Compliance-Team",
+          "assignmentDate": "[utcNow()]",
+          "environment": "[parameters('environmentName')]", 
+          "compliance": "HIPAA-CUSTOM",
+          "hipaaControl": "164.312(a)(1)",
+          "version": "1.0.0"
+        },
+        "enforcementMode": "Default"
+      }
+    }
+  ],
+  "outputs": {
+    "policyAssignments": {
+      "type": "array",
+      "value": [
+        {
+          "name": "[concat('hipaa-hitrust-compliance', variables('assignmentSuffix'))]",
+          "id": "[resourceId('Microsoft.Authorization/policyAssignments', concat('hipaa-hitrust-compliance', variables('assignmentSuffix')))]",
+          "scope": "[variables('policyScope')]",
+          "enforcementMode": "Default"
+        },
+        {
+          "name": "[concat('nist-800-53-compliance', variables('assignmentSuffix'))]",
+          "id": "[resourceId('Microsoft.Authorization/policyAssignments', concat('nist-800-53-compliance', variables('assignmentSuffix')))]",
+          "scope": "[variables('policyScope')]",
+          "enforcementMode": "Default"
+        },
+        {
+          "name": "[concat('azure-security-benchmark', variables('assignmentSuffix'))]",
+          "id": "[resourceId('Microsoft.Authorization/policyAssignments', concat('azure-security-benchmark', variables('assignmentSuffix')))]",
+          "scope": "[variables('policyScope')]",
+          "enforcementMode": "Default"
+        },
+        {
+          "name": "[concat('hipaa-rag-phi-encryption', variables('assignmentSuffix'))]",
+          "id": "[resourceId('Microsoft.Authorization/policyAssignments', concat('hipaa-rag-phi-encryption', variables('assignmentSuffix')))]",
+          "scope": "[variables('policyScope')]",
+          "enforcementMode": "Default"
+        },
+        {
+          "name": "[concat('hipaa-rag-private-endpoints', variables('assignmentSuffix'))]",
+          "id": "[resourceId('Microsoft.Authorization/policyAssignments', concat('hipaa-rag-private-endpoints', variables('assignmentSuffix')))]",
+          "scope": "[variables('policyScope')]",
+          "enforcementMode": "Default"
+        }
+      ]
+    },
+    "complianceScope": {
+      "type": "string",
+      "value": "[variables('policyScope')]"
+    },
+    "totalPoliciesAssigned": {
+      "type": "int",
+      "value": 8
+    }
+  }
+}

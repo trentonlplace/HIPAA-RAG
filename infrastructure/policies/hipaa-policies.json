@@ -1,0 +1,483 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "description": "HIPAA/HITRUST compliance policy definitions for RAG system",
+    "classification": "PHI-CRITICAL",
+    "author": "HIPAA Compliance Team",
+    "version": "1.0.0",
+    "lastUpdated": "2025-08-01"
+  },
+  "parameters": {
+    "resourceGroupName": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource group name for policy scope"
+      }
+    },
+    "subscriptionId": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure subscription ID"
+      }
+    },
+    "environmentName": {
+      "type": "string",
+      "allowedValues": [
+        "dev",
+        "staging", 
+        "prod"
+      ],
+      "metadata": {
+        "description": "Environment name"
+      }
+    }
+  },
+  "variables": {
+    "policyScope": "[concat('/subscriptions/', parameters('subscriptionId'), '/resourceGroups/', parameters('resourceGroupName'))]",
+    "complianceTags": {
+      "Compliance": "HIPAA",
+      "DataClassification": "PHI",
+      "Environment": "[parameters('environmentName')]",
+      "Purpose": "HIPAA-RAG-System"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Authorization/policyDefinitions",
+      "apiVersion": "2021-06-01",
+      "name": "hipaa-rag-require-phi-encryption",
+      "properties": {
+        "displayName": "HIPAA-RAG: Require PHI Data Encryption",
+        "description": "Ensures all resources handling PHI data use customer-managed encryption keys",
+        "policyType": "Custom",
+        "mode": "All",
+        "metadata": {
+          "category": "HIPAA Compliance",
+          "version": "1.0.0",
+          "hipaaControl": "164.312(a)(2)(iv)",
+          "description": "Technical Safeguards - Encryption and Decryption"
+        },
+        "parameters": {
+          "effect": {
+            "type": "String",
+            "metadata": {
+              "displayName": "Effect",
+              "description": "Enable or disable the execution of the policy"
+            },
+            "allowedValues": [
+              "Audit",
+              "Deny",
+              "Disabled"
+            ],
+            "defaultValue": "Audit"
+          }
+        },
+        "policyRule": {
+          "if": {
+            "allOf": [
+              {
+                "field": "type",
+                "in": [
+                  "Microsoft.Storage/storageAccounts",
+                  "Microsoft.Sql/servers/databases",
+                  "Microsoft.DocumentDB/databaseAccounts",
+                  "Microsoft.Search/searchServices",
+                  "Microsoft.CognitiveServices/accounts"
+                ]
+              },
+              {
+                "field": "tags['DataClassification']",
+                "equals": "PHI"
+              },
+              {
+                "anyOf": [
+                  {
+                    "allOf": [
+                      {
+                        "field": "type",
+                        "equals": "Microsoft.Storage/storageAccounts"
+                      },
+                      {
+                        "field": "Microsoft.Storage/storageAccounts/encryption.keySource",
+                        "notEquals": "Microsoft.Keyvault"
+                      }
+                    ]
+                  },
+                  {
+                    "allOf": [
+                      {
+                        "field": "type",
+                        "equals": "Microsoft.Sql/servers/databases"
+                      },
+                      {
+                        "field": "Microsoft.Sql/servers/databases/transparentDataEncryption.status",
+                        "notEquals": "Enabled"
+                      }
+                    ]
+                  },
+                  {
+                    "allOf": [
+                      {
+                        "field": "type",
+                        "equals": "Microsoft.DocumentDB/databaseAccounts"
+                      },
+                      {
+                        "anyOf": [
+                          {
+                            "field": "Microsoft.DocumentDB/databaseAccounts/keyVaultKeyUri",
+                            "exists": "false"
+                          },
+                          {
+                            "field": "Microsoft.DocumentDB/databaseAccounts/keyVaultKeyUri",
+                            "equals": ""
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "then": {
+            "effect": "[parameters('effect')]"
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/policyDefinitions", 
+      "apiVersion": "2021-06-01",
+      "name": "hipaa-rag-require-private-endpoints",
+      "properties": {
+        "displayName": "HIPAA-RAG: Require Private Endpoints for PHI Services",
+        "description": "Ensures PHI-handling services use private endpoints for network isolation",
+        "policyType": "Custom",
+        "mode": "All",
+        "metadata": {
+          "category": "HIPAA Compliance",
+          "version": "1.0.0",
+          "hipaaControl": "164.312(e)(1)",
+          "description": "Technical Safeguards - Transmission Security"
+        },
+        "parameters": {
+          "effect": {
+            "type": "String",
+            "metadata": {
+              "displayName": "Effect"
+            },
+            "allowedValues": [
+              "Audit",
+              "Deny",
+              "Disabled"
+            ],
+            "defaultValue": "Audit"
+          }
+        },
+        "policyRule": {
+          "if": {
+            "allOf": [
+              {
+                "field": "type",
+                "in": [
+                  "Microsoft.Storage/storageAccounts",
+                  "Microsoft.Sql/servers",
+                  "Microsoft.DocumentDB/databaseAccounts",
+                  "Microsoft.Search/searchServices",
+                  "Microsoft.CognitiveServices/accounts",
+                  "Microsoft.KeyVault/vaults"
+                ]
+              },
+              {
+                "field": "tags['DataClassification']",
+                "in": ["PHI", "ENCRYPTION-KEYS", "AUDIT"]
+              },
+              {
+                "anyOf": [
+                  {
+                    "field": "Microsoft.Storage/storageAccounts/networkAcls.defaultAction",
+                    "notEquals": "Deny"
+                  },
+                  {
+                    "field": "Microsoft.Sql/servers/publicNetworkAccess",
+                    "notEquals": "Disabled"
+                  },
+                  {
+                    "field": "Microsoft.DocumentDB/databaseAccounts/publicNetworkAccess",
+                    "notEquals": "Disabled"
+                  },
+                  {
+                    "field": "Microsoft.Search/searchServices/publicNetworkAccess",
+                    "notEquals": "Disabled"
+                  },
+                  {
+                    "field": "Microsoft.CognitiveServices/accounts/publicNetworkAccess",
+                    "notEquals": "Disabled"
+                  },
+                  {
+                    "field": "Microsoft.KeyVault/vaults/networkAcls.defaultAction",
+                    "notEquals": "Deny"
+                  }
+                ]
+              }
+            ]
+          },
+          "then": {
+            "effect": "[parameters('effect')]"
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/policyDefinitions",
+      "apiVersion": "2021-06-01", 
+      "name": "hipaa-rag-require-audit-logging",
+      "properties": {
+        "displayName": "HIPAA-RAG: Require Comprehensive Audit Logging",
+        "description": "Ensures all PHI-handling resources have diagnostic settings configured for audit logging",
+        "policyType": "Custom",
+        "mode": "All",
+        "metadata": {
+          "category": "HIPAA Compliance",
+          "version": "1.0.0",
+          "hipaaControl": "164.312(b)",
+          "description": "Technical Safeguards - Audit Controls"
+        },
+        "parameters": {
+          "effect": {
+            "type": "String",
+            "metadata": {
+              "displayName": "Effect"
+            },
+            "allowedValues": [
+              "AuditIfNotExists",
+              "DeployIfNotExists",
+              "Disabled"
+            ],
+            "defaultValue": "AuditIfNotExists"
+          },
+          "logAnalyticsWorkspaceId": {
+            "type": "String",
+            "metadata": {
+              "displayName": "Log Analytics Workspace ID",
+              "description": "Resource ID of the Log Analytics workspace"
+            }
+          }
+        },
+        "policyRule": {
+          "if": {
+            "allOf": [
+              {
+                "field": "type",
+                "in": [
+                  "Microsoft.Storage/storageAccounts",
+                  "Microsoft.Sql/servers",
+                  "Microsoft.DocumentDB/databaseAccounts", 
+                  "Microsoft.Search/searchServices",
+                  "Microsoft.CognitiveServices/accounts",
+                  "Microsoft.KeyVault/vaults",
+                  "Microsoft.Web/sites"
+                ]
+              },
+              {
+                "field": "tags['Compliance']",
+                "equals": "HIPAA"
+              }
+            ]
+          },
+          "then": {
+            "effect": "[parameters('effect')]",
+            "details": {
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "existenceCondition": {
+                "allOf": [
+                  {
+                    "field": "Microsoft.Insights/diagnosticSettings/workspaceId",
+                    "equals": "[parameters('logAnalyticsWorkspaceId')]"
+                  },
+                  {
+                    "field": "Microsoft.Insights/diagnosticSettings/logs[*].enabled",
+                    "equals": "true"
+                  },
+                  {
+                    "field": "Microsoft.Insights/diagnosticSettings/metrics[*].enabled",
+                    "equals": "true"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/policyDefinitions",
+      "apiVersion": "2021-06-01",
+      "name": "hipaa-rag-require-backup-retention", 
+      "properties": {
+        "displayName": "HIPAA-RAG: Require HIPAA-Compliant Backup Retention",
+        "description": "Ensures backups meet HIPAA 7-year retention requirements",
+        "policyType": "Custom",
+        "mode": "All",
+        "metadata": {
+          "category": "HIPAA Compliance",
+          "version": "1.0.0", 
+          "hipaaControl": "164.312(c)(2)",
+          "description": "Technical Safeguards - Integrity"
+        },
+        "parameters": {
+          "effect": {
+            "type": "String",
+            "metadata": {
+              "displayName": "Effect"
+            },
+            "allowedValues": [
+              "Audit",
+              "Deny",
+              "Disabled"
+            ],
+            "defaultValue": "Audit"
+          },
+          "minRetentionDays": {
+            "type": "Integer",
+            "metadata": {
+              "displayName": "Minimum Retention Days",
+              "description": "Minimum backup retention period in days (7 years = 2555 days)"
+            },
+            "defaultValue": 2555
+          }
+        },
+        "policyRule": {
+          "if": {
+            "allOf": [
+              {
+                "field": "type",
+                "in": [
+                  "Microsoft.Sql/servers/databases",
+                  "Microsoft.DocumentDB/databaseAccounts"
+                ]
+              },
+              {
+                "field": "tags['DataClassification']",
+                "equals": "PHI"
+              },
+              {
+                "anyOf": [
+                  {
+                    "allOf": [
+                      {
+                        "field": "type",
+                        "equals": "Microsoft.Sql/servers/databases"
+                      },
+                      {
+                        "field": "Microsoft.Sql/servers/databases/backupRetentionPolicyRetentionDays",
+                        "less": "[parameters('minRetentionDays')]"
+                      }
+                    ]
+                  },
+                  {
+                    "allOf": [
+                      {
+                        "field": "type", 
+                        "equals": "Microsoft.DocumentDB/databaseAccounts"
+                      },
+                      {
+                        "field": "Microsoft.DocumentDB/databaseAccounts/backupPolicy.periodicModeProperties.backupRetentionIntervalInHours",
+                        "less": "[mul(parameters('minRetentionDays'), 24)]"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "then": {
+            "effect": "[parameters('effect')]"
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/policyDefinitions",
+      "apiVersion": "2021-06-01",
+      "name": "hipaa-rag-require-access-controls",
+      "properties": {
+        "displayName": "HIPAA-RAG: Require Role-Based Access Controls",
+        "description": "Ensures proper RBAC is configured for PHI-handling resources",
+        "policyType": "Custom", 
+        "mode": "All",
+        "metadata": {
+          "category": "HIPAA Compliance",
+          "version": "1.0.0",
+          "hipaaControl": "164.312(a)(1)",
+          "description": "Technical Safeguards - Access Control"
+        },
+        "parameters": {
+          "effect": {
+            "type": "String",
+            "metadata": {
+              "displayName": "Effect"
+            },
+            "allowedValues": [
+              "AuditIfNotExists",
+              "Disabled"
+            ],
+            "defaultValue": "AuditIfNotExists"
+          }
+        },
+        "policyRule": {
+          "if": {
+            "allOf": [
+              {
+                "field": "type",
+                "in": [
+                  "Microsoft.Storage/storageAccounts",
+                  "Microsoft.Sql/servers",
+                  "Microsoft.DocumentDB/databaseAccounts",
+                  "Microsoft.Search/searchServices", 
+                  "Microsoft.CognitiveServices/accounts",
+                  "Microsoft.KeyVault/vaults"
+                ]
+              },
+              {
+                "field": "tags['DataClassification']",
+                "in": ["PHI", "ENCRYPTION-KEYS"]
+              }
+            ]
+          },
+          "then": {
+            "effect": "[parameters('effect')]",
+            "details": {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "existenceCondition": {
+                "field": "Microsoft.Authorization/roleAssignments/roleDefinitionId",
+                "in": [
+                  "/subscriptions/{subscriptionId}/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe",
+                  "/subscriptions/{subscriptionId}/providers/Microsoft.Authorization/roleDefinitions/17d1049b-9a84-46fb-8f53-869881c3d3ab",
+                  "/subscriptions/{subscriptionId}/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "policyDefinitionIds": {
+      "type": "array",
+      "value": [
+        "[resourceId('Microsoft.Authorization/policyDefinitions', 'hipaa-rag-require-phi-encryption')]",
+        "[resourceId('Microsoft.Authorization/policyDefinitions', 'hipaa-rag-require-private-endpoints')]", 
+        "[resourceId('Microsoft.Authorization/policyDefinitions', 'hipaa-rag-require-audit-logging')]",
+        "[resourceId('Microsoft.Authorization/policyDefinitions', 'hipaa-rag-require-backup-retention')]",
+        "[resourceId('Microsoft.Authorization/policyDefinitions', 'hipaa-rag-require-access-controls')]"
+      ]
+    },
+    "complianceScope": {
+      "type": "string",
+      "value": "[variables('policyScope')]"
+    }
+  }
+}
