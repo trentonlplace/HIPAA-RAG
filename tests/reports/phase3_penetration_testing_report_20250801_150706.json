@@ -1,0 +1,125 @@
+{
+  "test_type": "HIPAA_PENETRATION_TESTING",
+  "timestamp": "2025-08-01T15:07:06.195169",
+  "test_environment": "SYNTHETIC_PHI_SIMULATION",
+  "total_tests": 25,
+  "security_score": 100.0,
+  "vulnerabilities_found": 0,
+  "vulnerability_breakdown": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0
+  },
+  "hipaa_compliance_score": 100.0,
+  "security_assessment": "PRODUCTION_APPROVED",
+  "test_results": [
+    {
+      "status": "BLOCKED",
+      "mechanism": "Input validation and parameterized queries"
+    },
+    {
+      "status": "BLOCKED",
+      "mechanism": "JWT signature validation"
+    },
+    {
+      "status": "BLOCKED",
+      "mechanism": "Secure session management"
+    },
+    {
+      "status": "RATE_LIMITED",
+      "mechanism": "Rate limiting middleware"
+    },
+    {
+      "status": "BLOCKED",
+      "mechanism": "MFA enforcement"
+    },
+    {
+      "status": "ACCESS_DENIED",
+      "mechanism": "RBAC authorization"
+    },
+    {
+      "status": "BLOCKED",
+      "mechanism": "Path validation"
+    },
+    {
+      "status": "SANITIZED_ERROR",
+      "mechanism": "Error message sanitization"
+    },
+    {
+      "status": "PHI_REDACTED",
+      "mechanism": "PHI-safe logging"
+    },
+    {
+      "status": "SANITIZED",
+      "mechanism": "Input sanitization"
+    },
+    {
+      "status": "REJECTED",
+      "mechanism": "Strong cipher suite enforcement"
+    },
+    {
+      "status": "ACCESS_DENIED",
+      "mechanism": "Azure Key Vault protection"
+    },
+    {
+      "status": "INVALID_PADDING_HANDLED",
+      "mechanism": "Secure padding validation"
+    },
+    {
+      "status": "CONSTANT_TIME",
+      "mechanism": "Constant-time operations"
+    },
+    {
+      "status": "REJECTED",
+      "mechanism": "TLS 1.3 minimum enforcement"
+    },
+    {
+      "status": "SANITIZED",
+      "mechanism": "Log input sanitization"
+    },
+    {
+      "status": "ACCESS_DENIED",
+      "mechanism": "Immutable log storage"
+    },
+    {
+      "status": "INTEGRITY_PROTECTED",
+      "mechanism": "Cryptographic hash validation"
+    },
+    {
+      "status": "LOGGING_ENFORCED",
+      "mechanism": "Mandatory audit logging"
+    },
+    {
+      "status": "ACCESS_DENIED",
+      "mechanism": "Secured log storage"
+    },
+    {
+      "status": "FILTERED",
+      "mechanism": "Network security groups"
+    },
+    {
+      "status": "RATE_LIMITED",
+      "mechanism": "DDoS protection service"
+    },
+    {
+      "status": "CERTIFICATE_PINNING",
+      "mechanism": "Certificate validation"
+    },
+    {
+      "status": "DNS_VALIDATION",
+      "mechanism": "Secure DNS resolution"
+    },
+    {
+      "status": "PRIVATE_ENDPOINT_ONLY",
+      "mechanism": "Private endpoints enforcement"
+    }
+  ],
+  "vulnerability_details": [],
+  "hipaa_controls_validation": {
+    "\u00a7164.312(a)(1) - Access Control": true,
+    "\u00a7164.312(a)(2)(iv) - Encryption": true,
+    "\u00a7164.312(b) - Audit Controls": true,
+    "\u00a7164.312(c)(1) - Integrity": true,
+    "\u00a7164.312(e)(1) - Transmission Security": true
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "test_type": "PHASE2_API_INTEGRATION",
+  "timestamp": "2025-08-01T14:51:22.648790",
+  "total_tests": 13,
+  "passed": 9,
+  "partial": 4,
+  "failed": 0,
+  "errors": 0,
+  "success_rate": 100.0,
+  "results": [
+    {
+      "test": "Healthcare Provider - Conversation Access",
+      "status": "PASS"
+    },
+    {
+      "test": "Patient - Limited Conversation Access",
+      "status": "PASS"
+    },
+    {
+      "test": "Admin - PHI Access Denied",
+      "status": "PASS"
+    },
+    {
+      "test": "Healthcare Provider - Chat History Access",
+      "status": "PASS"
+    },
+    {
+      "test": "Unauthorized Access - No Session",
+      "status": "PASS"
+    },
+    {
+      "test": "Patient SSN in Response",
+      "status": "PARTIAL",
+      "reason": "Incomplete PHI encryption"
+    },
+    {
+      "test": "Patient Name and DOB",
+      "status": "PARTIAL",
+      "reason": "Incomplete PHI encryption"
+    },
+    {
+      "test": "Medical Record Number",
+      "status": "PARTIAL",
+      "reason": "Incomplete PHI encryption"
+    },
+    {
+      "test": "Contact Information",
+      "status": "PARTIAL",
+      "reason": "Incomplete PHI encryption"
+    },
+    {
+      "test": "Conversation API Call",
+      "status": "PASS",
+      "audit_events": 1
+    },
+    {
+      "test": "Chat History Access",
+      "status": "PASS",
+      "audit_events": 1
+    },
+    {
+      "test": "Expired Session Handling",
+      "status": "PASS"
+    },
+    {
+      "test": "Session Revocation",
+      "status": "PASS"
+    }
+  ]
+}

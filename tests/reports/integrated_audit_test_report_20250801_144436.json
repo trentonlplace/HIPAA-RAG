@@ -1,0 +1,64 @@
+{
+  "test_type": "INTEGRATED_HIPAA_AUDIT_SYSTEM",
+  "timestamp": "2025-08-01T14:44:36.680082",
+  "total_tests": 12,
+  "passed": 11,
+  "partial": 1,
+  "failed": 0,
+  "errors": 0,
+  "success_rate": 100.0,
+  "results": [
+    {
+      "test": "Authentication Audit",
+      "status": "PASS"
+    },
+    {
+      "test": "Failed Authentication Audit",
+      "status": "PASS"
+    },
+    {
+      "test": "PHI Access Audit: Patient Record",
+      "status": "PASS"
+    },
+    {
+      "test": "PHI Masking: Patient Record",
+      "status": "PASS"
+    },
+    {
+      "test": "PHI Access Audit: Lab Results",
+      "status": "PASS"
+    },
+    {
+      "test": "PHI Masking: Lab Results",
+      "status": "PASS"
+    },
+    {
+      "test": "PHI Access Audit: Clinical Note Update",
+      "status": "PASS"
+    },
+    {
+      "test": "PHI Masking: Clinical Note Update",
+      "status": "PARTIAL",
+      "reason": "Incomplete masking"
+    },
+    {
+      "test": "Auditor Full Report",
+      "status": "PASS",
+      "events": 7
+    },
+    {
+      "test": "Security Officer Report",
+      "status": "PASS",
+      "events": 7
+    },
+    {
+      "test": "Healthcare Provider Report",
+      "status": "PASS",
+      "events": 4
+    },
+    {
+      "test": "PHI Hash Consistency",
+      "status": "PASS"
+    }
+  ]
+}

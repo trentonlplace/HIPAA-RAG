@@ -1,0 +1,62 @@
+{
+  "test_type": "PHASE2_DOCUMENT_PROCESSING",
+  "timestamp": "2025-08-01T14:54:44.515372",
+  "total_tests": 12,
+  "passed": 11,
+  "partial": 0,
+  "failed": 1,
+  "errors": 0,
+  "success_rate": 91.66666666666666,
+  "results": [
+    {
+      "test": "Medical Record with SSN",
+      "status": "PASS"
+    },
+    {
+      "test": "Lab Results with Contact Info",
+      "status": "PASS"
+    },
+    {
+      "test": "General Medical Content",
+      "status": "PASS"
+    },
+    {
+      "test": "PHI Citation 1",
+      "status": "PASS"
+    },
+    {
+      "test": "PHI Citation 2",
+      "status": "PASS"
+    },
+    {
+      "test": "Non-PHI Citation 3",
+      "status": "PASS"
+    },
+    {
+      "test": "PHI Document Upload - Upload",
+      "status": "PASS"
+    },
+    {
+      "test": "PHI Document Upload - Download",
+      "status": "PASS"
+    },
+    {
+      "test": "Non-PHI Document Upload - Upload",
+      "status": "FAIL",
+      "reason": "No encryption"
+    },
+    {
+      "test": "Non-PHI Document Upload - Download",
+      "status": "PASS"
+    },
+    {
+      "test": "SAS Token Generation",
+      "status": "PASS"
+    },
+    {
+      "test": "End-to-End Pipeline Security",
+      "status": "PASS",
+      "checks_passed": "5/5"
+    }
+  ]
+}

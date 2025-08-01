@@ -1,0 +1,118 @@
+{
+  "test_type": "HIPAA_ACCESS_CONTROL",
+  "timestamp": "2025-08-01T14:42:21.443544",
+  "total_tests": 25,
+  "passed": 25,
+  "partial": 0,
+  "failed": 0,
+  "errors": 0,
+  "success_rate": 100.0,
+  "results": [
+    {
+      "test": "Healthcare Provider with MFA",
+      "status": "PASS",
+      "session_id": "session_dr_smith_001_20250801_144221"
+    },
+    {
+      "test": "Healthcare Provider without MFA",
+      "status": "PASS"
+    },
+    {
+      "test": "End User without MFA",
+      "status": "PASS",
+      "session_id": "session_patient_001_20250801_144221"
+    },
+    {
+      "test": "Security Officer with MFA",
+      "status": "PASS",
+      "session_id": "session_sec_officer_001_20250801_144221"
+    },
+    {
+      "test": "System Admin without MFA",
+      "status": "PASS"
+    },
+    {
+      "test": "Auditor with MFA",
+      "status": "PASS",
+      "session_id": "session_auditor_001_20250801_144221"
+    },
+    {
+      "test": "Healthcare Provider PHI Read",
+      "status": "PASS"
+    },
+    {
+      "test": "Healthcare Provider PHI Write",
+      "status": "PASS"
+    },
+    {
+      "test": "Healthcare Provider PHI Delete",
+      "status": "PASS"
+    },
+    {
+      "test": "End User PHI Read",
+      "status": "PASS"
+    },
+    {
+      "test": "End User Limited PHI Read",
+      "status": "PASS"
+    },
+    {
+      "test": "System Admin PHI Access",
+      "status": "PASS"
+    },
+    {
+      "test": "System Admin System Config",
+      "status": "PASS"
+    },
+    {
+      "test": "Security Officer Audit Access",
+      "status": "PASS"
+    },
+    {
+      "test": "Auditor PHI Write",
+      "status": "PASS"
+    },
+    {
+      "test": "Auditor Audit Logs Read",
+      "status": "PASS"
+    },
+    {
+      "test": "Session Tracking",
+      "status": "PASS",
+      "active_sessions": 10
+    },
+    {
+      "test": "Session Revocation",
+      "status": "PASS"
+    },
+    {
+      "test": "Invalid Session Handling",
+      "status": "PASS"
+    },
+    {
+      "test": "Audit Logging Coverage",
+      "status": "PASS",
+      "events_logged": 4
+    },
+    {
+      "test": "Audit Log Structure",
+      "status": "PASS"
+    },
+    {
+      "test": "Healthcare Provider - No Admin Access",
+      "status": "PASS"
+    },
+    {
+      "test": "System Admin - No PHI Access",
+      "status": "PASS"
+    },
+    {
+      "test": "End User - No Write Access",
+      "status": "PASS"
+    },
+    {
+      "test": "Auditor - No Write Access to PHI",
+      "status": "PASS"
+    }
+  ]
+}

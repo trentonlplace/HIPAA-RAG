@@ -1,0 +1,75 @@
+{
+  "test_type": "LOCAL_MOCK_ENCRYPTION",
+  "timestamp": "2025-08-01T14:38:48.534202",
+  "total_tests": 16,
+  "passed": 16,
+  "failed": 0,
+  "errors": 0,
+  "success_rate": 100.0,
+  "results": [
+    {
+      "test": "Patient Name",
+      "status": "PASS"
+    },
+    {
+      "test": "SSN",
+      "status": "PASS"
+    },
+    {
+      "test": "Medical Record Number",
+      "status": "PASS"
+    },
+    {
+      "test": "Email Address",
+      "status": "PASS"
+    },
+    {
+      "test": "Clinical Note",
+      "status": "PASS"
+    },
+    {
+      "test": "Lab Results",
+      "status": "PASS"
+    },
+    {
+      "test": "Date of Birth",
+      "status": "PASS"
+    },
+    {
+      "test": "Phone Number",
+      "status": "PASS"
+    },
+    {
+      "test": "Key Derivation",
+      "status": "PASS"
+    },
+    {
+      "test": "Cross-Record Isolation",
+      "status": "PASS"
+    },
+    {
+      "test": "Edge Case: Empty String",
+      "status": "PASS"
+    },
+    {
+      "test": "Edge Case: Whitespace Only",
+      "status": "PASS"
+    },
+    {
+      "test": "Edge Case: Single Character",
+      "status": "PASS"
+    },
+    {
+      "test": "Edge Case: Unicode Characters",
+      "status": "PASS"
+    },
+    {
+      "test": "Edge Case: Long Text",
+      "status": "PASS"
+    },
+    {
+      "test": "Edge Case: Special Characters",
+      "status": "PASS"
+    }
+  ]
+}

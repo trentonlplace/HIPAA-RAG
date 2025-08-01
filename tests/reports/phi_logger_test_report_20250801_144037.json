@@ -1,0 +1,97 @@
+{
+  "test_type": "PHI_SAFE_LOGGER",
+  "timestamp": "2025-08-01T14:40:37.084901",
+  "total_tests": 20,
+  "passed": 18,
+  "partial": 1,
+  "failed": 1,
+  "errors": 0,
+  "success_rate": 95.0,
+  "results": [
+    {
+      "test": "SSN Detection",
+      "status": "PASS"
+    },
+    {
+      "test": "MRN Detection",
+      "status": "PASS"
+    },
+    {
+      "test": "Email Detection",
+      "status": "PASS"
+    },
+    {
+      "test": "Phone Number Detection",
+      "status": "FAIL",
+      "reason": "No masking when expected"
+    },
+    {
+      "test": "Date of Birth Detection",
+      "status": "PASS"
+    },
+    {
+      "test": "Patient Name Detection",
+      "status": "PASS"
+    },
+    {
+      "test": "Address Detection",
+      "status": "PARTIAL",
+      "reason": "Missing expected PHI types"
+    },
+    {
+      "test": "Multiple PHI Types",
+      "status": "PASS"
+    },
+    {
+      "test": "Clinical Note with PHI",
+      "status": "PASS"
+    },
+    {
+      "test": "Safe Medical Content",
+      "status": "PASS"
+    },
+    {
+      "test": "Logging Level: INFO",
+      "status": "PASS"
+    },
+    {
+      "test": "Logging Level: WARNING",
+      "status": "PASS"
+    },
+    {
+      "test": "Logging Level: ERROR",
+      "status": "PASS"
+    },
+    {
+      "test": "Performance Test",
+      "status": "PASS",
+      "processing_time": 0.000729,
+      "phi_count": 4
+    },
+    {
+      "test": "Edge Case: Empty Message",
+      "status": "PASS"
+    },
+    {
+      "test": "Edge Case: Only Whitespace",
+      "status": "PASS"
+    },
+    {
+      "test": "Edge Case: Non-PHI Numbers",
+      "status": "PASS"
+    },
+    {
+      "test": "Edge Case: False Positive SSN",
+      "status": "PASS",
+      "note": "May detect as SSN - acceptable false positive"
+    },
+    {
+      "test": "Edge Case: Mixed Languages",
+      "status": "PASS"
+    },
+    {
+      "test": "Edge Case: Very Long Single Word",
+      "status": "PASS"
+    }
+  ]
+}
