@@ -431,3 +431,19 @@ tests/integration/ui/cypress/screenshots/
 .idea/
 Pipfile
 Pipfile.lock
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+tfplan
+.terraform.lock.hcl
+.terraform.tfstate.lock.info
+
+# Deployment artifacts
+deployment/resource-inventory.txt
+
+# OS files
+.DS_Store
